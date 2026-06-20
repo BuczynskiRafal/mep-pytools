@@ -1,0 +1,8 @@
+[project]
+name = "mep-pytools"
+version = "0.1.0"
+description = "Revit pyRevit add-in that connects two MEP elements by aligning their geometry."
+requires-python = ">=3.8"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
