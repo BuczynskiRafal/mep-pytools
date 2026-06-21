@@ -1,5 +1,5 @@
 """Put the pyRevit extension's lib/ folder on sys.path so tests can import
-smart_connect, exactly as pyRevit does at runtime."""
+fast_connect, exactly as pyRevit does at runtime."""
 
 import sys
 from pathlib import Path
