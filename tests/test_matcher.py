@@ -1,4 +1,4 @@
-from smart_connect import ConnectorDomain, ConnectorInfo, find_best_pair
+from fast_connect import ConnectorDomain, ConnectorInfo, find_best_pair
 
 
 def p(i, x, y, z, domain=ConnectorDomain.PIPING, size=0.5):
