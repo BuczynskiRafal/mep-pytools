@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Connects two picked MEP elements: aligns their geometry and creates the connection."""
 
-__title__ = "Smart\nConnect"
+__title__ = "Fast\nConnect"
 __doc__ = "Connects two picked MEP elements: aligns their geometry and creates the connection."
 __author__ = "Rafal Buczynski"
 
@@ -21,7 +21,7 @@ from Autodesk.Revit.UI.Selection import ObjectType, ISelectionFilter
 from Autodesk.Revit.Exceptions import OperationCanceledException
 from pyrevit import revit, forms
 
-from smart_connect import ConnectorDomain, ConnectorInfo, find_best_pair
+from fast_connect import ConnectorDomain, ConnectorInfo, find_best_pair
 
 SIZE_TOLERANCE_FEET = 1.0 / 304.8  # ~1 mm
 
@@ -45,7 +45,7 @@ class MepConnectableFilter(ISelectionFilter):
         return False
 
 
-def get_free_connectors(element):
+def get_end_connectors(element):
     manager = None
     if isinstance(element, MEPCurve):
         manager = element.ConnectorManager
@@ -54,7 +54,23 @@ def get_free_connectors(element):
     if manager is None:
         return []
     return [c for c in manager.Connectors
-            if c.ConnectorType == ConnectorType.End and not c.IsConnected]
+            if c.ConnectorType == ConnectorType.End]
+
+
+def get_free_connectors(element):
+    return [c for c in get_end_connectors(element) if not c.IsConnected]
+
+
+def is_same_connector(left, right):
+    return (left.Owner.Id == right.Owner.Id
+            and left.ConnectorType == right.ConnectorType
+            and left.Domain == right.Domain
+            and left.Origin.IsAlmostEqualTo(right.Origin))
+
+
+def has_connected_connectors_other_than(element, selected_connector):
+    return any(c.IsConnected and not is_same_connector(c, selected_connector)
+               for c in get_end_connectors(element))
 
 
 def to_info(connector, index):
@@ -123,7 +139,18 @@ def main():
     target = free_fixed[match[0].source_index]   # fixed
     source = free_moving[match[1].source_index]  # moving
 
-    transaction = Transaction(doc, "Smart Connect MEP")
+    if has_connected_connectors_other_than(moving_element, source):
+        proceed = forms.alert(
+            "The moving element has other connected connectors. Moving it can affect an existing MEP system.\n\n"
+            "Continue anyway?",
+            title="Fast Connect",
+            yes=True,
+            no=True,
+        )
+        if not proceed:
+            return
+
+    transaction = Transaction(doc, "Fast Connect MEP")
     transaction.Start()
     try:
         align_connectors(moving_element.Id, source, target)
@@ -131,7 +158,7 @@ def main():
         transaction.Commit()
     except Exception as error:
         transaction.RollBack()
-        forms.alert("Smart Connect error:\n{}".format(error))
+        forms.alert("Fast Connect error:\n{}".format(error))
 
 
 if __name__ == "__main__":
