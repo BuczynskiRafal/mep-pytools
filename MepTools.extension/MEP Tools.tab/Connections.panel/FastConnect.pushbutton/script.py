@@ -16,10 +16,13 @@ from Autodesk.Revit.DB import (
     XYZ,
     Transaction,
     ElementTransformUtils,
+    IFailuresPreprocessor,
+    FailureProcessingResult,
+    FailureSeverity,
 )
 from Autodesk.Revit.UI.Selection import ObjectType, ISelectionFilter
 from Autodesk.Revit.Exceptions import OperationCanceledException
-from pyrevit import revit, forms
+from pyrevit import revit, forms, HOST_APP
 
 from fast_connect import ConnectorDomain, ConnectorInfo, find_best_pair
 
@@ -61,16 +64,16 @@ def get_free_connectors(element):
     return [c for c in get_end_connectors(element) if not c.IsConnected]
 
 
-def is_same_connector(left, right):
-    return (left.Owner.Id == right.Owner.Id
-            and left.ConnectorType == right.ConnectorType
-            and left.Domain == right.Domain
-            and left.Origin.IsAlmostEqualTo(right.Origin))
+class MepConnectWarningSwallower(IFailuresPreprocessor):
+    def PreprocessFailures(self, failures_accessor):
+        for failure in failures_accessor.GetFailureMessages():
+            if failure.GetSeverity() == FailureSeverity.Warning:
+                failures_accessor.DeleteWarning(failure)
+        return FailureProcessingResult.Continue
 
 
-def has_connected_connectors_other_than(element, selected_connector):
-    return any(c.IsConnected and not is_same_connector(c, selected_connector)
-               for c in get_end_connectors(element))
+def _suppress_connected_move_dialog(sender, args):
+    args.OverrideResult(1)  # 1 = affirmative/OK on Revit's warning dialogs
 
 
 def to_info(connector, index):
@@ -139,19 +142,15 @@ def main():
     target = free_fixed[match[0].source_index]   # fixed
     source = free_moving[match[1].source_index]  # moving
 
-    if has_connected_connectors_other_than(moving_element, source):
-        proceed = forms.alert(
-            "The moving element has other connected connectors. Moving it can affect an existing MEP system.\n\n"
-            "Continue anyway?",
-            title="Fast Connect",
-            yes=True,
-            no=True,
-        )
-        if not proceed:
-            return
-
+    uiapp = HOST_APP.uiapp
     transaction = Transaction(doc, "Fast Connect MEP")
     transaction.Start()
+
+    options = transaction.GetFailureHandlingOptions()
+    options.SetFailuresPreprocessor(MepConnectWarningSwallower())
+    transaction.SetFailureHandlingOptions(options)
+
+    uiapp.DialogBoxShowing += _suppress_connected_move_dialog
     try:
         align_connectors(moving_element.Id, source, target)
         source.ConnectTo(target)
@@ -159,6 +158,8 @@ def main():
     except Exception as error:
         transaction.RollBack()
         forms.alert("Fast Connect error:\n{}".format(error))
+    finally:
+        uiapp.DialogBoxShowing -= _suppress_connected_move_dialog
 
 
 if __name__ == "__main__":
