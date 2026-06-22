@@ -1,7 +1,10 @@
+from typing import Optional
+
 from fast_connect import ConnectorDomain, ConnectorInfo, find_best_pair
 
 
 def p(i, x, y, z, domain=ConnectorDomain.PIPING, size=0.5):
+    # type: (int, float, float, float, ConnectorDomain, Optional[float]) -> ConnectorInfo
     return ConnectorInfo(i, x, y, z, domain, size)
 
 
@@ -32,3 +35,10 @@ def test_rejects_mismatched_pipe_size_beyond_tolerance():
 
 def test_returns_none_when_no_connectors():
     assert find_best_pair([], [p(0, 0, 0, 0)]) is None
+
+
+def test_skips_size_check_when_size_unknown():
+    a = [p(0, 0, 0, 0, size=None)]
+    b = [p(0, 0, 0, 0, size=0.9)]
+
+    assert find_best_pair(a, b, size_tolerance=0.01) is not None

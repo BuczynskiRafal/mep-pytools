@@ -3,6 +3,7 @@
 import math
 from dataclasses import dataclass
 from enum import Enum
+from typing import Optional
 
 
 class ConnectorDomain(Enum):
@@ -18,7 +19,7 @@ class ConnectorInfo:
     """Description of a single connector, with no Revit types.
 
     source_index lets the Revit layer recover the live Connector afterwards.
-    size is the diameter for round connectors, or 0 when irrelevant/unknown.
+    size is the diameter for round connectors, or None when not applicable.
     """
 
     source_index: int
@@ -26,7 +27,7 @@ class ConnectorInfo:
     y: float
     z: float
     domain: ConnectorDomain
-    size: float
+    size: Optional[float] = None
 
     def distance_to(self, other):
         dx = self.x - other.x
@@ -38,7 +39,7 @@ class ConnectorInfo:
         if self.domain != other.domain:
             return False
         if (self.domain == ConnectorDomain.PIPING
-                and self.size > 0 and other.size > 0
+                and self.size is not None and other.size is not None
                 and abs(self.size - other.size) > size_tolerance):
             return False
         return True
